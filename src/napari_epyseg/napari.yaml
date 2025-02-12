@@ -1,0 +1,11 @@
+name: napari-epyseg
+display_name: Napari-EpySeg
+categories: ["Segmentation"]
+contributions:
+  commands:
+    - id: napari-epyseg.start
+      python_name: napari_epyseg.start_epyseg:start_epyseg
+      title: Start
+  widgets:
+    - command: napari-epyseg.start
+      display_name: Napari-EpySeg
