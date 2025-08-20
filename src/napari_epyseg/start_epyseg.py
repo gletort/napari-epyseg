@@ -24,9 +24,13 @@ def start_epyseg():
     cdir = hist[0]
     viewer = current_viewer()
     paras = dict()
-    paras["tile-width"] = 32
-    paras["tile-height"] = 32
-    return choose_parameters( viewer, paras ) 
+    paras["overlap_width"] = 32
+    paras["overlap_height"] = 32
+    paras["tile_width"] = 256
+    paras["tile_height"] = 256
+    paras["norm_min"] = 0
+    paras["norm_max"] = 1
+    return choose_parameters( viewer, paras )
 
 def choose_parameters( viewer, parameters ):
     @magicgui(call_button="Save segmentation",
@@ -43,23 +47,45 @@ def choose_parameters( viewer, parameters ):
         """ Show/hide the model file interface (if custom is selected) """
         get_parameters.model_file.visible = (get_parameters.model.value == "custom model")
     
+    def show_parameters():
+        """ Handle advanced parameters visibility """
+        get_parameters.overlap_width.visible = (get_parameters.advanced.value == True)
+        get_parameters.overlap_height.visible = (get_parameters.advanced.value == True)
+        get_parameters.tile_width.visible = (get_parameters.advanced.value == True)
+        get_parameters.tile_height.visible = (get_parameters.advanced.value == True)
+        get_parameters.normalization_min_percentile.visible = (get_parameters.advanced.value == True)
+        get_parameters.normalization_max_percentile.visible = (get_parameters.advanced.value == True)
+
     @magicgui(call_button="Segment",
             image={'label': 'Pick an Image'},
             model={'label': 'Model to use', "choices": ['epyseg default(v2)', 'custom model']},
             model_file = {'label': 'Custom model file (.h5)'},
+            normalization_min_percentile={"widget_type": "LiteralEvalLineEdit"},
+            normalization_max_percentile={"widget_type": "LiteralEvalLineEdit"},
             tile_width={"widget_type": "LiteralEvalLineEdit"},
             tile_height={"widget_type": "LiteralEvalLineEdit"},
+            overlap_width={"widget_type": "LiteralEvalLineEdit"},
+            overlap_height={"widget_type": "LiteralEvalLineEdit"},
             )
     def get_parameters( 
             image: Image,
             model = "epyseg default(v2)",
             model_file = pathlib.Path(cdir),
-            tile_width = 32,
-            tile_height = 32, 
+            advanced = False,
+            normalization_min_percentile = parameters["norm_min"],
+            normalization_max_percentile = parameters["norm_max"],
+            tile_width = parameters["tile_width"],
+            tile_height = parameters["tile_height"],
+            overlap_width = parameters["overlap_width"],
+            overlap_height = parameters["overlap_height"],
             ):
         """ Choose the parameters to run Epyseg on selected file """
         parameters["tile_width"] = tile_width
         parameters["tile_height"] = tile_height
+        parameters["overlap_width"] = overlap_width
+        parameters["overlap_height"] = overlap_height
+        parameters["norm_min"] = normalization_min_percentile
+        parameters["norm_max"] = normalization_max_percentile
         parameters["model"] = model
         parameters["model_file"] = str(model_file)
         res = run_epyseg( image.data, parameters )
@@ -68,7 +94,9 @@ def choose_parameters( viewer, parameters ):
     
     get_parameters.model.changed.connect( show_model_file )
     get_parameters.model_file.visible = False
+    get_parameters.advanced.changed.connect( show_parameters )
     wid = viewer.window.add_dock_widget( get_parameters )
+    show_parameters()
     return wid
 
 
@@ -97,8 +125,8 @@ def run_epyseg_onfolder( input_folder, paras ):
             return None
         deepTA.load_weights( paras["model_file"] )
 
-    input_val_width = 256
-    input_val_height = 256
+    input_val_width = int( paras["tile_width"] )
+    input_val_height = int( paras["tile_height"] )
 
     input_shape = deepTA.get_inputs_shape()
     output_shape = deepTA.get_outputs_shape()
@@ -106,10 +134,12 @@ def run_epyseg_onfolder( input_folder, paras ):
         input_val_width=input_shape[0][-2]
     if input_shape[0][-3] is not None:
         input_val_height=input_shape[0][-3]
-    #print(input_shape)
+    print(input_shape)
     deepTA.compile(optimizer='adam', loss='bce_jaccard_loss', metrics=['iou_score'])
 
-    range_input = [0,1]
+    minp = float( paras["norm_min"])
+    maxp = float( paras["norm_max"])
+    range_input = [minp, maxp]
     input_normalization = {'method': 'Rescaling (min-max normalization)',
                         'individual_channels': True, 'range': range_input, 'clip': True}
 
@@ -118,8 +148,8 @@ def run_epyseg_onfolder( input_folder, paras ):
             output_shape=output_shape,
             default_input_tile_width=input_val_width,
             default_input_tile_height=input_val_height,
-            tile_width_overlap=int(paras["tile-width"]),
-            tile_height_overlap=int(paras["tile-height"]),
+            tile_width_overlap=int(paras["overlap_width"]),
+            tile_height_overlap=int(paras["overlap_height"]),
             input_normalization=input_normalization,
             clip_by_frequency={'lower_cutoff': None, 'upper_cutoff': None, 'channel_mode': True} )
 
