@@ -12,6 +12,9 @@ To install it directly outside of napari, create/reuse and activate a python env
 pip install napari-epyseg
 ```
 
+> [!IMPORTANT]
+> `epyseg` is compatible until python 3.10 (included), but not for versions of python above. Thus, `napari-epyseg` is also compatible with python versions until 3.10
+
 ## Usage
 
 In Napari, go to `Plugins>napari-epyseg` to start it.
@@ -31,8 +34,12 @@ Choose where to save the file and the file name with the `Segmentation filename`
 
 ## Remark
 
-This plugin was tested on python 3.10, with epyseg version 0.1.52, napari version 0.4.19
+This plugin was tested on python 3.10, with epyseg version 0.1.52, napari version 0.4.19, tensorflow 2.14
 
+## Troubleshooting
+
+* On Linux Ubuntu, python 3.10, epyseg don't run with tensorflow 2.15 and output the error: `DNN not found`. Downgrading tensorflow to 2.14 worked.
+* `tifffile versions` compability: some versions of tifffile where not compatible with epyseg, but recent versions are now fine. `tifffile <= 2021.11.2` are fine and `tifffile==2025.1.10` also.
 
 ## License
 

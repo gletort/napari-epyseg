@@ -118,8 +118,8 @@ def run_epyseg_onfolder( input_folder, paras ):
             output_shape=output_shape,
             default_input_tile_width=input_val_width,
             default_input_tile_height=input_val_height,
-            tile_width_overlap=int(paras["tile_width"]),
-            tile_height_overlap=int(paras["tile_height"]),
+            tile_width_overlap=int(paras["tile-width"]),
+            tile_height_overlap=int(paras["tile-height"]),
             input_normalization=input_normalization,
             clip_by_frequency={'lower_cutoff': None, 'upper_cutoff': None, 'channel_mode': True} )
 
