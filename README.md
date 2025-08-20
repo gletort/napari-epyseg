@@ -1,3 +1,4 @@
+
 # napari-epyseg
 
 Plugin to run [EpySeg](https://github.com/baigouy/EPySeg) directly in [Napari](https://napari.org/stable/).
@@ -43,4 +44,5 @@ This plugin was tested on python 3.10, with epyseg version 0.1.52, napari versio
 
 ## License
 
-This plugin is distributed under the BDS-3 license
+This plugin is distributed under the BDS-3 license.
+If you use this plugin, please cite [Epyseg](https://journals.biologists.com/dev/article/147/24/dev194589/226105/EPySeg-a-coding-free-solution-for-automated) and the plugin with its doi: [![DOI](https://zenodo.org/badge/931444556.svg)](https://doi.org/10.5281/zenodo.16910935)
