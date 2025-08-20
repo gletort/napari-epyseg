@@ -1,3 +1,5 @@
+[![DOI](https://zenodo.org/badge/931444556.svg)](https://doi.org/10.5281/zenodo.16910935)
+[![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 
 # napari-epyseg
 
