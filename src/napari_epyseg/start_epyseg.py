@@ -1,16 +1,13 @@
 from napari.utils.history import get_save_history, update_save_history 
 from napari import current_viewer
-import tensorflow as tf
-import sys, os
+import os
 from magicgui import magicgui
 from napari.layers import Image
 import numpy as np
 from napari.utils import notifications as nt
+from napari.utils import progress # type: ignore
 
-from epyseg.img import Img
 from epyseg.deeplearning.deepl import EZDeepLearning
-from epyseg.deeplearning.augmentation.meta import MetaAugmenter
-from epyseg.deeplearning.augmentation.generators.data import DataGenerator
 
 from PIL import Image as pilImage
 import os
@@ -40,6 +37,9 @@ def choose_parameters( viewer, parameters ):
         save_file = pathlib.Path(os.path.join(cdir)),
         ):
         """ Save file interface """
+        if not str(save_file).endswith(".tif"):
+            nt.show_warning("Unvalid segmentation filename (should be a tif file), set it to a correct file path")
+            return
         update_save_history(save_file)
         save_segmentation_file( str(save_file), viewer )
 
@@ -56,6 +56,27 @@ def choose_parameters( viewer, parameters ):
         get_parameters.normalization_min_percentile.visible = (get_parameters.advanced.value == True)
         get_parameters.normalization_max_percentile.visible = (get_parameters.advanced.value == True)
 
+    def show_channel():
+        """ Show/hide channel choice depending on selected layer """
+        shape = get_parameters.image.value.data.shape
+        print(shape)
+        get_parameters.channel.visible = (len(shape)>3)
+
+    def display_channel():
+        """ Display the selected channel """
+        img = viewer.layers[ get_parameters.image.value.name ].data
+        chan_axis = 1
+        ## check that the color channel axis is the second one
+        if img.shape[0] < img.shape[1]:
+            chan_axis = 0
+        chan_nb = get_parameters.channel.value
+        if (chan_nb < 0) or (chan_nb>img.shape[chan_axis]):
+            nt.show_warning("Invalid channel number, set a value in the correct range: [0-"+str(img.shape[chan_axis]-1)+"]")
+            return 
+        viewer.dims.set_point( chan_axis, get_parameters.channel.value )
+        
+
+
     @magicgui(call_button="Segment",
             image={'label': 'Pick an Image'},
             model={'label': 'Model to use', "choices": ['epyseg default(v2)', 'custom model']},
@@ -69,6 +90,7 @@ def choose_parameters( viewer, parameters ):
             )
     def get_parameters( 
             image: Image,
+            channel: int=0,
             model = "epyseg default(v2)",
             model_file = pathlib.Path(cdir),
             advanced = False,
@@ -88,11 +110,25 @@ def choose_parameters( viewer, parameters ):
         parameters["norm_max"] = normalization_max_percentile
         parameters["model"] = model
         parameters["model_file"] = str(model_file)
-        res = run_epyseg( image.data, parameters )
+        img = image.data
+        chan_axis = 1
+        if len(img.shape) > 3:
+            if img.shape[0] < img.shape[1]:
+                img = img[channel,]
+                chan_axis = 0
+            else:
+                img = img[:,channel,]
+        viewer.window._status_bar._toggle_activity_dock( True )
+        res = run_epyseg( img, parameters )
+        viewer.window._status_bar._toggle_activity_dock( False )
+        if len(res.shape) < len(image.data.shape):
+            res = np.expand_dims( res, axis=chan_axis )
         viewer.add_image( res, scale=image.scale, blending="additive", name="Segmentation" )
         viewer.window.add_dock_widget( save_interface )
     
     get_parameters.model.changed.connect( show_model_file )
+    get_parameters.image.changed.connect( show_channel )
+    get_parameters.channel.changed.connect( display_channel )
     get_parameters.model_file.visible = False
     get_parameters.advanced.changed.connect( show_parameters )
     wid = viewer.window.add_dock_widget( get_parameters )
@@ -181,6 +217,7 @@ def run_epyseg( img, paras, verbose=True):
     tmpdir_path = None
     filename = "image"
     movie = []
+
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
             print("tmp dir "+str(tmpdir))
@@ -190,6 +227,9 @@ def run_epyseg( img, paras, verbose=True):
             # if 2D image makes it 3D so that everything is handled the same
             if len(img.shape) == 2:
                 img = np.expand_dims( img, axis=0 )
+            progress_bar = progress( len(img) )
+            progress_bar.set_description( "Running epyseg on all frames..." )
+            progress_bar.update(0)
             for i, imslice in enumerate(img):
                 with pilImage.fromarray(imslice) as im:
                     numz = "{0:0=5d}".format(i)
@@ -200,8 +240,10 @@ def run_epyseg( img, paras, verbose=True):
             except:
                 print("Warning, issue in creating "+predict_output_folder+" folder")
 
+            progress_bar.update(1)
             ## run Epyseg on tmp directory (contains current image)
             run_epyseg_onfolder( tmpdir, paras )
+            progress_bar.update(2)
 
             ## return result and delete files
             for i in range(len(img)):
@@ -211,6 +253,7 @@ def run_epyseg( img, paras, verbose=True):
                 im.close()
             os.chmod(os.path.join(tmpdir, "predict", inputname), 0o777)
             os.remove( os.path.join(tmpdir, "predict", inputname) )
+            progress_bar.close()
     except:
         pass
 
@@ -222,8 +265,11 @@ def save_segmentation_file( filename, viewer ):
         nt.show_warning("No segmentation found")
         return
     lay = viewer.layers["Segmentation"]
+    laydata = lay.data
+    if len(laydata.shape) > 3:
+        laydata = lay.data[:,0,:,:]
 
-    writeTif( lay.data, filename, lay.scale, "uint8", what="Segmentation" )
+    writeTif( laydata, filename, lay.scale, "uint8", what="Segmentation" )
 
 def writeTif(img, imgname, scale, imtype, what=""):
     """ Write image in tif format """
