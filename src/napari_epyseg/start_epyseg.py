@@ -119,7 +119,7 @@ def choose_parameters( viewer, parameters ):
             else:
                 img = img[:,channel,]
         viewer.window._status_bar._toggle_activity_dock( True )
-        res = run_epyseg( img, parameters )
+        res = run_epyseg( img, parameters, prog=True )
         viewer.window._status_bar._toggle_activity_dock( False )
         if len(res.shape) < len(image.data.shape):
             res = np.expand_dims( res, axis=chan_axis )
@@ -211,7 +211,7 @@ def run_epyseg_onfolder( input_folder, paras ):
     #deepTA = None
     del deepTA
 
-def run_epyseg( img, paras, verbose=True):
+def run_epyseg( img, paras, prog=False, verbose=True):
     """ Run EpySeg on selected image or movie - Use a temporary directory """
 
     tmpdir_path = None
@@ -227,9 +227,10 @@ def run_epyseg( img, paras, verbose=True):
             # if 2D image makes it 3D so that everything is handled the same
             if len(img.shape) == 2:
                 img = np.expand_dims( img, axis=0 )
-            progress_bar = progress( len(img) )
-            progress_bar.set_description( "Running epyseg on all frames..." )
-            progress_bar.update(0)
+            if prog:
+                progress_bar = progress( len(img) )
+                progress_bar.set_description( "Running epyseg on all frames..." )
+                progress_bar.update(0)
             for i, imslice in enumerate(img):
                 with pilImage.fromarray(imslice) as im:
                     numz = "{0:0=5d}".format(i)
@@ -240,10 +241,12 @@ def run_epyseg( img, paras, verbose=True):
             except:
                 print("Warning, issue in creating "+predict_output_folder+" folder")
 
-            progress_bar.update(1)
+            if prog:
+                progress_bar.update(1)
             ## run Epyseg on tmp directory (contains current image)
             run_epyseg_onfolder( tmpdir, paras )
-            progress_bar.update(2)
+            if prog:
+                progress_bar.update(2)
 
             ## return result and delete files
             for i in range(len(img)):
@@ -253,7 +256,8 @@ def run_epyseg( img, paras, verbose=True):
                 im.close()
             os.chmod(os.path.join(tmpdir, "predict", inputname), 0o777)
             os.remove( os.path.join(tmpdir, "predict", inputname) )
-            progress_bar.close()
+            if prog:
+                progress_bar.close()
     except:
         pass
 
